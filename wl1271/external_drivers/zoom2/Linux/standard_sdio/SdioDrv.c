@@ -55,6 +55,7 @@ typedef struct OMAP3430_sdiodrv
 	int (*wlanDrvIf_pm_suspend)(void);
 #endif
 	struct device *dev;
+	void		(*notify_sdio_ready)(void);
 	int           sdio_host_claim_ref;
 	/* Inactivity Timer */
 	struct work_struct sdio_opp_set_work;
@@ -67,6 +68,17 @@ extern int sdio_reset_comm(struct mmc_card *card);
 unsigned char *pElpData;
 static OMAP3430_sdiodrv_t g_drv;
 static struct sdio_func *tiwlan_func[1 + SDIO_TOTAL_FUNCS];
+
+void sdioDrv_Register_Notification(void (*notify_sdio_ready)(void))
+{
+	g_drv.notify_sdio_ready = notify_sdio_ready;
+
+	/* do we already have an sdio function available ?
+	 * (this is relevant in real card-detect scenarios like external boards)
+	 * If so, notify its existence to the WLAN driver */
+	if (tiwlan_func[SDIO_WLAN_FUNC] && g_drv.notify_sdio_ready)
+			g_drv.notify_sdio_ready();
+}
 
 #if (LINUX_VERSION_CODE == KERNEL_VERSION(2, 6, 32))
 extern void tick_nohz_disable(int nohz);
@@ -430,6 +442,9 @@ static int tiwlan_sdio_probe(struct sdio_func *func, const struct sdio_device_id
 	tiwlan_func[SDIO_WLAN_FUNC] = func;
 	tiwlan_func[SDIO_CTRL_FUNC] = func;
 
+	if (g_drv.notify_sdio_ready)
+		g_drv.notify_sdio_ready();
+
 	/* inactivity timer initialization*/
 	init_timer(&g_drv.inact_timer);
 	g_drv.inact_timer.function = sdioDrv_inact_timer;
@@ -457,19 +472,10 @@ MODULE_DEVICE_TABLE(sdio, tiwl12xx_devices);
 
 int sdio_tiwlan_suspend(struct device *dev)
 {
-	int rc = 0;
+	if(g_drv.sdio_host_claim_ref)
+		return -1;
 
-#ifdef CONNECTION_SCAN_PM
-	/* Tell WLAN driver to suspend, if a suspension function has been registered */
-	if (g_drv.wlanDrvIf_pm_suspend) {
-		rc = g_drv.wlanDrvIf_pm_suspend();
-		if (rc != 0)
-			return rc;
-	}
-	sdioDrv_cancel_inact_timer();
-	sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
-#endif
-	return rc;
+	return 0;
 }
 
 int sdio_tiwlan_resume(struct device *dev)
@@ -548,7 +554,7 @@ out:
 void sdioDrv_exit(void)
 {
 	sdio_unregister_driver(&tiwlan_sdio_drv);
-	if(pElpData);
+	if(pElpData)
 		kfree(pElpData);
 	printk(KERN_INFO "TI WiLink 1271 SDIO Driver unloaded\n");
 }

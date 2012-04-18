@@ -59,8 +59,8 @@
 
 
 
-#define PMENA_GPIO                      101
-#define IRQ_GPIO                        162
+#define PMENA_GPIO                      22//101
+#define IRQ_GPIO                        15//162
 
 #define MUXMODE_3                       3
 #define TNETW_IRQ                       (OMAP_GPIO_IRQ(IRQ_GPIO))

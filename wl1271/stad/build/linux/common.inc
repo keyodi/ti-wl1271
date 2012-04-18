@@ -186,7 +186,7 @@ endif
 ##
 ##
 
-EXTRA_CFLAGS += -fsigned-char -Werror
+EXTRA_CFLAGS += -fsigned-char
 EXTRA_CFLAGS += -D __LINUX__ -DTI_RANDOM_DEFAULT_MAC
 EXTRA_CFLAGS += $(DK_DEFINES)
 EXTRA_CFLAGS += $(PFORM_DEFINES)
